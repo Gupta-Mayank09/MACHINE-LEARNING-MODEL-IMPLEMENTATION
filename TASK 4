@@ -1,0 +1,140 @@
+# spam_detector_idle.py
+
+# --- 1. Import Libraries ---
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os # For checking file existence
+
+print("Libraries loaded successfully.")
+
+# --- 2. Load the Dataset ---
+# Make sure 'spam.csv' is in the same directory as this script.
+dataset_filename = 'spam.csv'
+
+if not os.path.exists(dataset_filename):
+    print(f"Error: '{dataset_filename}' not found in the current directory.")
+    print("Please ensure the file is downloaded and placed next to this script.")
+    print("Download from: https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset")
+    # Exit the script if the file is not found
+    exit()
+
+try:
+    df = pd.read_csv(dataset_filename, encoding='latin-1')
+    print(f"Dataset '{dataset_filename}' loaded.")
+except Exception as e:
+    print(f"Error loading dataset: {e}")
+    exit()
+
+# Display initial columns (for debugging/verification)
+print("\nOriginal DataFrame Columns:", df.columns.tolist())
+
+# Drop unnecessary columns and rename relevant ones for clarity
+# The dataset often has columns like 'Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'
+# We only need 'v1' (label) and 'v2' (message)
+if len(df.columns) >= 2:
+    df = df.iloc[:, :2] # Select first two columns
+    df.columns = ['label', 'message'] # Rename columns
+else:
+    print("Error: Dataset does not have expected number of columns.")
+    exit()
+
+
+print("\nCleaned DataFrame Head:")
+print(df.head())
+
+# Check the distribution of labels (spam vs. ham)
+print("\nLabel Distribution:")
+print(df['label'].value_counts())
+
+# Convert labels to numerical format (ham: 0, spam: 1) for model training
+df['label'] = df['label'].map({'ham': 0, 'spam': 1})
+print("\nLabel Distribution (Numerical):")
+print(df['label'].value_counts())
+print("\nDataFrame Info:")
+df.info()
+
+# --- 3. Split Data into Training and Testing Sets ---
+X = df['message'] # Features are the email messages
+y = df['label']   # Target is the spam/ham label
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"\nTraining set size: {len(X_train)} samples")
+print(f"Testing set size: {len(X_test)} samples")
+
+# --- 4. Feature Extraction (TF-IDF Vectorization) ---
+tfidf_vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
+
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+print("Text data vectorized using TF-IDF.")
+print(f"Shape of X_train_tfidf: {X_train_tfidf.shape}")
+print(f"Shape of X_test_tfidf: {X_test_tfidf.shape}")
+
+# --- 5. Model Training (Multinomial Naive Bayes) ---
+model = MultinomialNB()
+model.fit(X_train_tfidf, y_train)
+
+print("\nMultinomial Naive Bayes model training complete.")
+
+# --- 6. Model Prediction ---
+y_pred = model.predict(X_test_tfidf)
+
+print("Predictions made on the test set.")
+
+# --- 7. Model Evaluation ---
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+
+print(f"\n--- Model Evaluation ---")
+print(f"Accuracy: {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-Score: {f1:.4f}")
+
+conf_matrix = confusion_matrix(y_test, y_pred)
+print("\nConfusion Matrix:")
+print(conf_matrix)
+
+# Visualize Confusion Matrix
+plt.figure(figsize=(6, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
+            xticklabels=['Ham (Predicted 0)', 'Spam (Predicted 1)'],
+            yticklabels=['Ham (Actual 0)', 'Spam (Actual 1)'])
+plt.xlabel('Predicted Label')
+plt.ylabel('Actual Label')
+plt.title('Confusion Matrix for Spam Detection')
+plt.show() # This line is important for displaying the plot in IDLE
+
+# --- 8. Test with Custom Input ---
+def predict_message(message):
+    message_tfidf = tfidf_vectorizer.transform([message])
+    prediction = model.predict(message_tfidf)[0]
+    
+    if prediction == 1:
+        return "Spam"
+    else:
+        return "Ham"
+
+print("\n--- Custom Message Predictions ---")
+test_message_1 = "Congratulations! You've won a free iPhone. Click here to claim."
+print(f"'{test_message_1}' is predicted as: {predict_message(test_message_1)}")
+
+test_message_2 = "Hey, how are you doing today? Let's catch up soon."
+print(f"'{test_message_2}' is predicted as: {predict_message(test_message_2)}")
+
+test_message_3 = "URGENT! Your bank account has been compromised. Verify immediately via link."
+print(f"'{test_message_3}' is predicted as: {predict_message(test_message_3)}")
+
+test_message_4 = "Hi, can you send me the report by end of day?"
+print(f"'{test_message_4}' is predicted as: {predict_message(test_message_4)}")
+
+print("\nScript execution finished.")
